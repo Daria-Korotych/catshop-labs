@@ -8,6 +8,9 @@ services:
     environment:
       # `db` resolves because Compose puts both services on one network.
       DATABASE_URL: postgresql://shop:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@db:5432/shop
+      # The partner's base URL is configuration, so a stub can stand in for the real API.
+      PARTNER_URL: http://partner:8080
+      PARTNER_TIMEOUT: "2"
     depends_on:
       db:
         condition: service_healthy
@@ -27,6 +30,13 @@ services:
       timeout: 3s
       retries: 10
       start_period: 10s
+
+  # Stand-in for the third-party API: WireMock replays ./partner/mappings.
+  partner:
+    image: wiremock/wiremock:3.6.0
+    command: ["--verbose", "--disable-banner"]
+    volumes:
+      - ./partner/mappings:/home/wiremock/mappings:ro
 
 volumes:
   pgdata:
