@@ -14,6 +14,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    # The only service on more than one network, so the only path between the outside, the db and the partner.
+    networks: [frontend, backend, partnernet]
 
   db:
     image: postgres:16-alpine
@@ -30,6 +32,7 @@ services:
       timeout: 3s
       retries: 10
       start_period: 10s
+    networks: [backend]
 
   # Stand-in for the third-party API: WireMock replays ./partner/mappings.
   partner:
@@ -37,6 +40,15 @@ services:
     command: ["--verbose", "--disable-banner"]
     volumes:
       - ./partner/mappings:/home/wiremock/mappings:ro
+    networks: [partnernet]
 
 volumes:
   pgdata:
+
+networks:
+  frontend:
+  # internal: true removes the gateway, so the db can reach the app and nothing else.
+  backend:
+    internal: true
+  partnernet:
+    internal: true
