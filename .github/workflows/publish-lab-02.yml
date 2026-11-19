@@ -35,6 +35,10 @@ jobs:
   image:
     needs: test
     runs-on: ubuntu-24.04
+    # GITHUB_TOKEN gets only what the workflow asks for; pushing to GHCR needs write
+    permissions:
+      contents: read
+      packages: write
     outputs:
       digest: ${{ steps.build.outputs.digest }}
     steps:
