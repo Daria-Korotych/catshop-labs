@@ -29,6 +29,15 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - id: pip-cache
+        run: echo "dir=$(pip cache dir)" >> "$GITHUB_OUTPUT"
+      - id: deps
+        uses: actions/cache@v6
+        with:
+          path: ${{ steps.pip-cache.outputs.dir }}
+          # hashFiles makes the key change exactly when the dependencies do
+          key: pip-${{ runner.os }}-3.12-${{ hashFiles('lab-02/requirements*.txt') }}
+          restore-keys: pip-${{ runner.os }}-3.12-
       - run: pip install -r requirements.txt -r requirements-dev.txt
       - run: python -m pytest tests -q
 
@@ -69,6 +78,9 @@ jobs:
           tags: ${{ steps.meta.outputs.image }}:${{ github.sha }}
           # ties the image to the commit it was built from
           labels: org.opencontainers.image.revision=${{ github.sha }}
+          cache-from: type=gha,scope=lab-02
+          # mode=max: pip install lives in the build stage, which min would not export
+          cache-to: type=gha,scope=lab-02,mode=max
 
       - name: digest
         if: steps.meta.outputs.publish == 'true'
