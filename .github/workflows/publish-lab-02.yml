@@ -1,0 +1,91 @@
+name: publish-lab-02
+
+on:
+  push:
+    paths:
+      - "lab-02/**"
+      - "!lab-02/published.txt"
+      - "!lab-02/*.md"
+      - ".github/workflows/publish-lab-02.yml"
+  pull_request:
+    paths:
+      - "lab-02/**"
+      - "!lab-02/published.txt"
+      - "!lab-02/*.md"
+      - ".github/workflows/publish-lab-02.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: lab-02
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - id: pip-cache
+        run: echo "dir=$(pip cache dir)" >> "$GITHUB_OUTPUT"
+      - id: deps
+        uses: actions/cache@v6
+        with:
+          path: ${{ steps.pip-cache.outputs.dir }}
+          # hashFiles makes the key change exactly when the dependencies do
+          key: pip-${{ runner.os }}-3.12-${{ hashFiles('lab-02/requirements*.txt') }}
+          restore-keys: pip-${{ runner.os }}-3.12-
+      - run: pip install -r requirements.txt -r requirements-dev.txt
+      - run: python -m pytest tests -q
+
+  image:
+    needs: test
+    runs-on: ubuntu-24.04
+    # GITHUB_TOKEN gets only what the workflow asks for; pushing to GHCR needs write
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+
+      # only a push publishes; a pull request builds and stops
+      - id: meta
+        env:
+          PUBLISH: ${{ github.event_name == 'push' }}
+        run: |
+          # GHCR rejects uppercase in the image path
+          echo "image=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+          echo "publish=$PUBLISH" >> "$GITHUB_OUTPUT"
+
+      - if: steps.meta.outputs.publish == 'true'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: lab-02
+          push: ${{ steps.meta.outputs.publish }}
+          tags: ${{ steps.meta.outputs.image }}:${{ github.sha }}
+          # ties the image to the commit it was built from
+          labels: org.opencontainers.image.revision=${{ github.sha }}
+          cache-from: type=gha,scope=lab-02
+          # mode=max: pip install lives in the build stage, which min would not export
+          cache-to: type=gha,scope=lab-02,mode=max
+
+      - name: digest
+        if: steps.meta.outputs.publish == 'true'
+        env:
+          REF: ${{ steps.meta.outputs.image }}@${{ steps.build.outputs.digest }}
+        run: |
+          echo "$REF"
+          echo "$REF" >> "$GITHUB_STEP_SUMMARY"

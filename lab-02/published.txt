@@ -1,0 +1,1 @@
+ghcr.io/daria-korotych/catshop-labs@sha256:da26d2e4abfd812bb463c154499309c9d0e18a8892f9886a6f5cc388b10b20a1

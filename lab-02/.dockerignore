@@ -1,0 +1,10 @@
+.git
+.env
+__pycache__/
+*.pyc
+.venv/
+data/
+tests/
+requirements-dev.txt
+*.md
+published.txt
